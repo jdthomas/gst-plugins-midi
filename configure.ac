@@ -5,6 +5,10 @@ GST_MAJORMINOR=0.10
 GST_REQUIRED=0.10.0
 GSTPB_REQUIRED=0.10.0
 
+dnl *** required versions of GStreamer stuff ***
+GST_REQ=0.10.15
+GSTPB_REQ=0.10.15
+
 dnl fill in your package name and version here
 dnl the fourth (nano) number should be 0 for a release, 1 for CVS,
 dnl and 2... for a prerelease
@@ -128,8 +132,7 @@ AG_GST_CHECK_PLUGIN(midi)
 
 dnl *** fluid synth midi ***
 #AM_CONDITIONAL(USE_MIDI, true)
-#translit(dnm, m, l) 
-AM_CONDITIONAL(USE_FLUID, true)
+translit(dnm, m, l) AM_CONDITIONAL(USE_FLUID, true)
 AG_GST_CHECK_FEATURE(FLUID, [fluid synth], fluid, [
   AG_GST_PKG_CHECK_MODULES(FLUID, fluidsynth >= 1.0.0)
 ])
@@ -145,7 +148,5 @@ AC_OUTPUT(
 			 m4/Makefile 
 			 gst/Makefile 
 			 gst/midi/Makefile
-			 ext/Makefile
-			 ext/fluidsynth/Makefile
 			 )
 
