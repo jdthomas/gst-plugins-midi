@@ -159,23 +159,6 @@ chunk_ensure (GstAdapter *adapter, Chunk *chunk, guint size)
 }
 /******************************************************************************/
 static void
-gst_smfdec_reset (GstSmfdec *dec)
-{
-  gst_adapter_clear (dec->adapter);
-  chunk_clear (&dec->chunk);
-  dec->format = 0;
-  dec->start = 0;
-  dec->status = 0;
-  dec->division = 1;
-  dec->ticks = 0;
-  dec->buf_start = 0;
-  dec->buf_num = 0;
-  dec->buf_denom = 0;
-  dec->buf_sent = 0;
-  gst_smfdec_set_tempo (dec, 480000);
-}
-
-static void
 gst_smfdec_set_tempo (GstSmfdec *dec, guint64 tempo)
 {
   dec->start += dec->ticks * dec->tempo / dec->division;
@@ -212,6 +195,23 @@ gst_smfdec_buffer_push (GstSmfdec *dec)
 }
 
 static void
+gst_smfdec_reset (GstSmfdec *dec)
+{
+  gst_adapter_clear (dec->adapter);
+  chunk_clear (&dec->chunk);
+  dec->format = 0;
+  dec->start = 0;
+  dec->status = 0;
+  dec->division = 1;
+  dec->ticks = 0;
+  dec->buf_start = 0;
+  dec->buf_num=1024;
+  dec->buf_denom=44100;
+  dec->buf_sent = 0;
+  gst_smfdec_set_tempo (dec, 480000);
+}
+
+static void
 gst_smfdec_buffer_append (GstSmfdec *dec, guint8 status, const guint8 *data, guint len)
 {
   GstClockTime time = dec->start + dec->ticks * dec->tempo / dec->division;
@@ -222,10 +222,8 @@ gst_smfdec_buffer_append (GstSmfdec *dec, guint8 status, const guint8 *data, gui
   if (!dec->buf || time >= dec->buf->timestamp + dec->buf->duration) {
     if (dec->buf)
       gst_smfdec_buffer_push (dec);
-	 g_print("***Here: %s:%d\n",__FILE__,__LINE__);
     gst_smfdec_buffer_new (dec, time);
   }
-  g_print("***Here: %s:%d\n",__FILE__,__LINE__);
   gst_midi_buffer_append_with_status (dec->buf, time, status, data, len);
 }
 
@@ -241,8 +239,10 @@ gst_smfdec_src_setcaps (GstPad * pad, GstCaps * caps)
 
   if (dec->buf_denom)
     dec->buf_start += dec->buf_sent * GST_SECOND * dec->buf_num / dec->buf_denom;
+#if 0
   dec->buf_num = gst_value_get_fraction_numerator (value);
   dec->buf_denom = gst_value_get_fraction_denominator (value);
+#endif
   dec->buf_sent = 0;
   gst_object_unref(dec);
   return TRUE;
@@ -318,20 +318,16 @@ gst_smfdec_chain (GstPad * pad, GstBuffer * data)
 
 	/* we must be negotiated */
 	g_assert ( dec != NULL );
-	g_print("***Here: %p %d\n",dec,dec->buf_denom);
-	dec->buf_denom=11025;
 	g_assert (dec->buf_denom > 0);
 
 	gst_adapter_push (dec->adapter, GST_BUFFER (data));
 	if (dec->chunk.fourcc) {
 		chunk_ensure (dec->adapter, &dec->chunk, 0);
 	}
-	g_print("***Here: %s:%d\n",__FILE__,__LINE__);
 
 	while (dec->chunk.fourcc || get_next_chunk (dec->adapter, &dec->chunk)) {
 		switch (dec->chunk.fourcc) {
 			case GST_MAKE_FOURCC ('M', 'T', 'h', 'd'):
-				g_print("****Here: %s:%d\n",__FILE__,__LINE__);
 				if (dec->format) {
 					GST_ELEMENT_ERROR (dec, STREAM, DECODE, (NULL), 
 							("got a header chunk while already initialized"));
@@ -349,7 +345,7 @@ gst_smfdec_chain (GstPad * pad, GstBuffer * data)
 				if (dec->format > 2)
 					g_warning ("I have no clue if midi format %u works", dec->format - 1);
 				dec->tracks_missing = GST_READ_UINT16_BE (dec->chunk.data + 2);
-				g_assert (dec->tracks_missing == 1);
+				//g_assert (dec->tracks_missing == 1);
 				/* ignore the number of track atoms */
 				i = (gint16) GST_READ_UINT16_BE (dec->chunk.data + 4);
 				if (i < 0) {
@@ -363,7 +359,6 @@ gst_smfdec_chain (GstPad * pad, GstBuffer * data)
 				chunk_flush (dec->adapter, &dec->chunk);
 				break;
 			case GST_MAKE_FOURCC ('M', 'T', 'r', 'k'):
-				g_print("****Here: %s:%d\n",__FILE__,__LINE__);
 				if (dec->format == 0) {
 					GST_ELEMENT_ERROR (dec, STREAM, DECODE, (NULL), 
 							("got a track chunk while not yet initialized"));
@@ -377,12 +372,10 @@ gst_smfdec_chain (GstPad * pad, GstBuffer * data)
 							("invalid delta time value"));
 					goto error;
 				}
-				g_print("***Here: %s:%d\n",__FILE__,__LINE__);
 				midi_len = gst_midi_data_get_length (dec->chunk.data + len, 
 						dec->chunk.available - len, dec->status);
 				if (midi_len == 0) goto out;
 				/* we have enough data, process */
-				g_print("***Here: %s:%d\n",__FILE__,__LINE__);
 				dec->ticks += ticks;
 				//g_print ("got %u ticks, now %u\n", ticks, dec->ticks);
 				if (dec->chunk.data[len] & 0x80) {
@@ -394,9 +387,7 @@ gst_smfdec_chain (GstPad * pad, GstBuffer * data)
 					if (!gst_smfdec_meta_event (dec, dec->chunk.data + len, midi_len))
 						goto error;
 				} else {
-					g_print("***Here: %s:%d\n",__FILE__,__LINE__);
 					gst_smfdec_buffer_append (dec, dec->status, dec->chunk.data + len, midi_len);
-					g_print("***Here: %s:%d\n",__FILE__,__LINE__);
 				}
 				chunk_skip (dec->adapter, &dec->chunk, len + midi_len);
 				if (dec->chunk.length == 0)
@@ -483,7 +474,7 @@ gst_smfdec_base_init (gpointer g_class)
 {
   static GstElementDetails gst_smfdec_details =
   GST_ELEMENT_DETAILS ("standard midi file to midi converter",
-      "Codec/Demuxer/Audio",
+      "Demuxer/Decoder/Audio",
       "Convert a midi file to GStreamer midi representation",
       "Benjamin Otte <otte@gnome.org>");
 

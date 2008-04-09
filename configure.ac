@@ -28,6 +28,22 @@ AC_SUBST(ACLOCAL_AMFLAGS, "-I m4")
 
 AM_CONFIG_HEADER(config.h)
 
+AG_GST_ARG_DEBUG
+AG_GST_ARG_PROFILING
+AG_GST_ARG_VALGRIND
+AG_GST_ARG_GCOV
+
+AG_GST_ARG_WITH_PKG_CONFIG_PATH
+AG_GST_ARG_WITH_PACKAGE_NAME
+AG_GST_ARG_WITH_PACKAGE_ORIGIN
+
+AG_GST_ARG_WITH_PLUGINS
+
+AG_GST_ARG_ENABLE_EXTERNAL
+
+AG_GST_ARG_ENABLE_EXPERIMENTAL
+
+
 dnl check for tools
 AC_PROG_CC
 AC_PROG_LIBTOOL
@@ -130,6 +146,17 @@ AC_SUBST(plugindir)
 dnl 
 AG_GST_CHECK_PLUGIN(midi)
 
+dnl *** alsa ***
+translit(dnm, m, l) AM_CONDITIONAL(USE_ALSA, true)
+AG_GST_CHECK_FEATURE(ALSA, [ALSA], alsa, [
+  PKG_CHECK_MODULES(ALSA, alsa >= 0.9.1, [
+    HAVE_ALSA="yes"
+    AC_SUBST(ALSA_CFLAGS)
+    AC_SUBST(ALSA_LIBS)
+  ], [
+    AM_PATH_ALSA(0.9.1, HAVE_ALSA="yes", HAVE_ALSA="no")
+  ])
+])
 dnl *** fluid synth midi ***
 #AM_CONDITIONAL(USE_MIDI, true)
 translit(dnm, m, l) AM_CONDITIONAL(USE_FLUID, true)
@@ -148,5 +175,9 @@ AC_OUTPUT(
 			 m4/Makefile 
 			 gst/Makefile 
 			 gst/midi/Makefile
+			 ext/Makefile
+			 ext/fluidsynth/Makefile
+			 ext/alsa/Makefile
+			 ext/PianoDisc/Makefile
 			 )
 

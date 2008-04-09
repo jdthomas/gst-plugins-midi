@@ -30,7 +30,6 @@
 GstMidiBuffer *	
 gst_midi_buffer_new (GstClockTime timestamp, GstClockTime duration)
 {
-  g_print("***Here: %s:%d\n",__FILE__,__LINE__);
   g_return_val_if_fail (GST_CLOCK_TIME_IS_VALID (timestamp), NULL);
   g_return_val_if_fail (GST_CLOCK_TIME_IS_VALID (duration), NULL);
 
@@ -47,8 +46,6 @@ void
 gst_midi_buffer_append (GstMidiBuffer *buf, GstClockTime time, 
     const guint8 *data, guint len)
 {
-  g_print("***Here: %s:%d\n",__FILE__,__LINE__);
-
   g_return_if_fail (GST_IS_BUFFER (buf));
   g_return_if_fail (data != NULL);
   g_return_if_fail (data[0] & 0x80);
@@ -63,12 +60,6 @@ void
 gst_midi_buffer_append_with_status (GstMidiBuffer *buf, GstClockTime time,
     guint8 status, const guint8 *data, guint len)
 {
-  g_print("***Here: %s:%d\n",__FILE__,__LINE__);
-	/*
-  guint space;
-  gboolean realloc = FALSE;
-  */
-  
   g_return_if_fail (GST_IS_BUFFER (buf));
   g_return_if_fail (status & 0x80);
   g_return_if_fail (data != NULL);
@@ -78,23 +69,14 @@ gst_midi_buffer_append_with_status (GstMidiBuffer *buf, GstClockTime time,
 
   gint oldsize=buf->size;
   buf->size = buf->size + len + 9;
-  buf->data = g_realloc (buf->data,buf->size);
-  /*
-  space = GST_BUFFER_MAXSIZE(buf) - buf->size;
-  while (space < len + 9) {
-    GST_BUFFER_MAXSIZE(buf) *= 2;
-    space = GST_BUFFER_MAXSIZE(buf) - buf->size;
-    realloc = TRUE;
-  }
-  if (realloc)
-    buf->data = g_realloc (buf->data, GST_BUFFER_MAXSIZE(buf));
-  */
+  if ( oldsize )
+	  buf->data = g_realloc (buf->data,buf->size);
+  else
+	  buf->data = g_malloc (buf->size);
 
   GST_WRITE_UINT64_BE (buf->data + oldsize, time);
   buf->data[oldsize + 8] = status;
-  //buf->size += 9;
-  memcpy (buf->data + oldsize, data, len);
-  //buf->size += len;
+  memcpy (buf->data + oldsize + 9, data, len);
 }
 
 GstBuffer *
