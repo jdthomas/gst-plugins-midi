@@ -249,7 +249,7 @@ gst_fluidsynth_chain (GstPad * pad, GstBuffer * data)
 			g_print ("ERROR ERROR ERROR");
 			return GST_FLOW_ERROR;
 		}
-    gst_buffer_set_caps (GST_BUFFER (out), synth->out_caps);
+		gst_buffer_set_caps (GST_BUFFER (out), synth->out_caps);
 		gst_pad_push (synth->src, GST_BUFFER (out));
 		synth->expected += GST_SECOND * 1024 / 44100;
 	}
@@ -258,7 +258,6 @@ gst_fluidsynth_chain (GstPad * pad, GstBuffer * data)
 	if( ret != GST_FLOW_OK ){
 		return ret;
 	}
-	//gst_buffer_stamp (out, in);
 	gst_buffer_copy_metadata (out, in,GST_BUFFER_COPY_TIMESTAMPS);
 	for (i = 0; i < 1024 / 64; i++) {
 		last += in->duration * (i + 1) * 64 / 1024;
@@ -276,7 +275,7 @@ gst_fluidsynth_chain (GstPad * pad, GstBuffer * data)
 	synth->expected = in->timestamp + in->duration;
 	gst_buffer_unref (data);
 	//g_print ("pushing %llu\n", GST_BUFFER_TIMESTAMP (out));
-  gst_buffer_set_caps (GST_BUFFER (out), synth->out_caps);
+	gst_buffer_set_caps (GST_BUFFER (out), synth->out_caps);
 	gst_pad_push (synth->src, GST_BUFFER (out));
 	gst_object_unref(synth);
 
@@ -291,8 +290,8 @@ gst_fluidsynth_change_state (GstElement * element, GstStateChange transition )
 
 	switch (transition) {
 		case GST_STATE_CHANGE_NULL_TO_READY:
-      fluidsynth->out_caps =
-        gst_caps_copy (gst_pad_get_pad_template_caps (fluidsynth->src));
+			fluidsynth->out_caps =
+				gst_caps_copy (gst_pad_get_pad_template_caps (fluidsynth->src));
 			break;
 		case GST_STATE_CHANGE_READY_TO_PAUSED:
 			gst_fluidsynth_start (fluidsynth);
@@ -310,7 +309,7 @@ gst_fluidsynth_change_state (GstElement * element, GstStateChange transition )
 			gst_fluidsynth_end (fluidsynth);
 			break;
 		case GST_STATE_CHANGE_READY_TO_NULL:
-      gst_caps_unref (fluidsynth->out_caps);
+			gst_caps_unref (fluidsynth->out_caps);
 			break;
 		default:
 			break;
