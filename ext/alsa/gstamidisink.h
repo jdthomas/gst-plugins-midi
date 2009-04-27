@@ -25,7 +25,7 @@ struct _GstaMIDISink
 {
   GstBaseSink basesink;
 
-  GstPad *sinkpad;
+  //GstPad *sinkpad;
 
   gint port, client, delay;
   gchar* device;

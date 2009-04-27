@@ -25,9 +25,12 @@ struct _GstaMIDISrc
 {
   GstPushSrc element;
 
-  GstPad *srcpad;
-
+  gint port, client;
+  gchar* device;
   gboolean silent;
+
+  gint a_port,a_queue;
+  snd_seq_t * a_seq;
 };
 
 struct _GstaMIDISrcClass 

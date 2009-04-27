@@ -48,7 +48,6 @@ static void gst_amidisink_set_property (GObject * object, guint prop_id,
 static void gst_amidisink_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec);
 
-static gboolean gst_amidisink_set_caps (GstPad * pad, GstCaps * caps);
 static GstFlowReturn gst_amidisink_render (GstBaseSink * bsink, GstBuffer * buf);
 static GstStateChangeReturn gst_aplaymidi_change_state (GstElement * element, GstStateChange transition );
 
@@ -74,9 +73,12 @@ gst_amidisink_class_init (GstaMIDISinkClass * klass)
 {
   GObjectClass *gobject_class;
   GstElementClass *gstelement_class;
+  GstBaseSinkClass *b_class;
+
 
   gobject_class = (GObjectClass *) klass;
   gstelement_class = (GstElementClass *) klass;
+  b_class = (GstBaseSinkClass *) klass;
 
   gobject_class->set_property = gst_amidisink_set_property;
   gobject_class->get_property = gst_amidisink_get_property;
@@ -108,15 +110,9 @@ gst_amidisink_init (GstaMIDISink * sink,
   GstElementClass *klass = GST_ELEMENT_GET_CLASS (sink);
   GstBaseSinkClass *gstbasesink_class;
 
-  sink->sinkpad =
-      gst_pad_new_from_template (gst_element_class_get_pad_template (klass,
-          "sink"), "sink");
-  gst_pad_set_setcaps_function (sink->sinkpad,
-                                GST_DEBUG_FUNCPTR(gst_amidisink_set_caps));
-  gst_pad_set_getcaps_function (sink->sinkpad,
-                                GST_DEBUG_FUNCPTR(gst_pad_proxy_getcaps));
-
-  gst_element_add_pad (GST_ELEMENT (sink), sink->sinkpad);
+  sink->device = g_strdup("default");
+  sink->client = 128;
+  sink->port   = 0;
 
   gstbasesink_class = (GstBaseSinkClass *) klass;
   gstbasesink_class->render = GST_DEBUG_FUNCPTR(gst_amidisink_render);
@@ -173,15 +169,6 @@ gst_amidisink_get_property (GObject * object, guint prop_id,
 }
 
 /* GstElement vmethod implementations */
-
-/* this function handles the link with other elements */
-static gboolean
-gst_amidisink_set_caps (GstPad * pad, GstCaps * caps)
-{
-  GstaMIDISink *sink;
-  sink = GST_AMIDISINK (gst_pad_get_parent (pad));
-  return gst_pad_set_caps (pad, caps);
-}
 
 /* chain function
  * this function does the actual processing
@@ -324,7 +311,7 @@ gst_aplaymidi_change_state (GstElement * element, GstStateChange transition )
         return GST_STATE_CHANGE_FAILURE;
       }
       sink->a_queue = snd_seq_alloc_queue(sink->a_seq);
-      if( sink->a_queue <= 0 )
+      if( sink->a_queue < 0 )
         return GST_STATE_CHANGE_FAILURE;
       if( snd_seq_connect_to(sink->a_seq, sink->a_port, sink->client, sink->port) < 0 )
         return GST_STATE_CHANGE_FAILURE;

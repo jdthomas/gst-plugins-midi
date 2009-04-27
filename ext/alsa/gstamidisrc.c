@@ -15,6 +15,9 @@
 #  include <config.h>
 #endif
 
+#include "gstmidibuffer.h"
+#include <alsa/asoundlib.h>
+
 #include <gst/gst.h>
 
 #include "gstamidisrc.h"
@@ -32,6 +35,9 @@ enum
 enum
 {
   ARG_0,
+  ARG_PORT,
+  ARG_CLIENT,
+  ARG_DEVICE,
   ARG_SILENT
 };
 
@@ -90,6 +96,16 @@ gst_amidisrc_class_init (GstaMIDISrcClass * klass)
   gobject_class->set_property = gst_amidisrc_set_property;
   gobject_class->get_property = gst_amidisrc_get_property;
 
+  g_object_class_install_property (gobject_class, ARG_PORT,
+      g_param_spec_int ("port", "Port", "Alsa MIDI Port to connect to.",
+        G_MININT, G_MAXINT,-1, G_PARAM_READWRITE));
+  g_object_class_install_property (gobject_class, ARG_CLIENT,
+      g_param_spec_int ("client", "Client", "Alsa MIDI Client to connect to.",
+        G_MININT, G_MAXINT,-1, G_PARAM_READWRITE));
+  g_object_class_install_property (gobject_class, ARG_DEVICE,
+      g_param_spec_string ("device", "Device", "Alsa MIDI Device to connect to.",
+        "default", G_PARAM_READWRITE));
+
   g_object_class_install_property (gobject_class, ARG_SILENT,
       g_param_spec_boolean ("silent", "Silent", "Produce verbose output ?",
           FALSE, G_PARAM_READWRITE));
@@ -98,8 +114,8 @@ gst_amidisrc_class_init (GstaMIDISrcClass * klass)
 
   gstpushsrc_class->create = gst_amidisrc_create;
 
-  gstbasesrc_class->start = gst_amidisrc_start;
-  gstbasesrc_class->stop = gst_amidisrc_stop;
+  gstbasesrc_class->start = GST_DEBUG_FUNCPTR ( gst_amidisrc_start );
+  gstbasesrc_class->stop = GST_DEBUG_FUNCPTR ( gst_amidisrc_stop );
   gstbasesrc_class->is_seekable = gst_amidisrc_is_seekable;
 }
 
@@ -109,30 +125,35 @@ gst_amidisrc_class_init (GstaMIDISrcClass * klass)
  * initialize structure
  */
 static void
-gst_amidisrc_init (GstaMIDISrc * filter,
+gst_amidisrc_init (GstaMIDISrc * src,
     GstaMIDISrcClass * gclass)
 {
-  GstElementClass *klass = GST_ELEMENT_GET_CLASS (filter);
 
-  filter->srcpad =
-      gst_pad_new_from_template (gst_element_class_get_pad_template (klass,
-          "src"), "src");
-  gst_pad_set_getcaps_function (filter->srcpad,
-                                GST_DEBUG_FUNCPTR(gst_pad_proxy_getcaps));
-
-  gst_element_add_pad (GST_ELEMENT (filter), filter->srcpad);
-  filter->silent = FALSE;
+  src->device = g_strdup("default");
+  src->client = -1;
+  src->port   = -1;
+  src->silent = FALSE;
 }
 
 static void
 gst_amidisrc_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec)
 {
-  GstaMIDISrc *filter = GST_AMIDISRC (object);
+  GstaMIDISrc *src = GST_AMIDISRC (object);
 
   switch (prop_id) {
+    case ARG_PORT:
+      src->port = g_value_get_int (value);
+      break;
+    case ARG_CLIENT:
+      src->client = g_value_get_int (value);
+      break;
+    case ARG_DEVICE:
+      if( src->device ) g_free(src->device);
+      src->device = g_strdup(g_value_get_string (value));
+      break;
     case ARG_SILENT:
-      filter->silent = g_value_get_boolean (value);
+      src->silent = g_value_get_boolean (value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -144,11 +165,20 @@ static void
 gst_amidisrc_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec)
 {
-  GstaMIDISrc *filter = GST_AMIDISRC (object);
+  GstaMIDISrc *src = GST_AMIDISRC (object);
 
   switch (prop_id) {
+    case ARG_PORT:
+      g_value_set_int (value, src->port);
+      break;
+    case ARG_CLIENT:
+      g_value_set_int (value, src->client);
+      break;
+    case ARG_DEVICE:
+      g_value_set_string (value, src->device);
+      break;
     case ARG_SILENT:
-      g_value_set_boolean (value, filter->silent);
+      g_value_set_boolean (value, src->silent);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -159,12 +189,15 @@ gst_amidisrc_get_property (GObject * object, guint prop_id,
 /* GstElement vmethod implementations */
 static gboolean gst_amidisrc_start (GstBaseSrc * bsrc)
 {
-	// TODO: start capturing midi events.
+	//GstaMIDISrc *src = GST_AMIDISRC (bsrc);
+	// TODO: start capturing midi events
+	printf("***Here: %s:%d\n",__FILE__,__LINE__);
 	return TRUE;
 }
 static gboolean gst_amidisrc_stop (GstBaseSrc * bsrc)
 {
 	// TODO: stop capturing midi events
+	printf("***Here: %s:%d\n",__FILE__,__LINE__);
 	return TRUE;
 }
 
@@ -191,7 +224,7 @@ static GstFlowReturn gst_amidisrc_create (GstPushSrc * psrc, GstBuffer ** outbuf
 
 
 	//TODO:
-	g_print("***Here: %s:%d\n",__FILE__,__LINE__);
+	printf("***Here: %s:%d\n",__FILE__,__LINE__);
 #if 0
 	snd_seq_event_t *a_event=NULL;
 	snd_seq_event_input(src->a_seq,&a_event);
@@ -205,11 +238,36 @@ static GstStateChangeReturn
 gst_amidisrc_change_state (GstElement * element, GstStateChange transition )
 {
   GstStateChangeReturn ret = GST_STATE_CHANGE_SUCCESS;
-  //GstaMIDISrc *src = GST_AMIDISRC (element);
+  GstaMIDISrc *src = GST_AMIDISRC (element);
 
   switch (transition) {
     case GST_STATE_CHANGE_NULL_TO_READY:
 		 // TODO: Open our listen alsa ports
+		//     1. Open sequencer
+		//     2. If we have a client and port, connect to them
+		printf("***Here: %s:%d\n",__FILE__,__LINE__);
+
+		if ((snd_seq_open(&src->a_seq, src->device, SND_SEQ_OPEN_INPUT, 0)) < 0)
+			return GST_STATE_CHANGE_FAILURE;
+		if( src->a_seq == NULL )
+			return GST_STATE_CHANGE_FAILURE;
+		snd_seq_set_client_name(src->a_seq, "gstreamer");
+		if ((src->a_port = snd_seq_create_simple_port(src->a_seq, "In",
+						SND_SEQ_PORT_CAP_WRITE |
+						SND_SEQ_PORT_CAP_SUBS_WRITE,
+						SND_SEQ_PORT_TYPE_MIDI_GENERIC)) < 0)
+		{
+			return GST_STATE_CHANGE_FAILURE;
+		}
+		src->a_queue = snd_seq_alloc_queue(src->a_seq);
+		if( src->a_queue < 0 )
+			return GST_STATE_CHANGE_FAILURE;
+		// Only connect if we have positive client/port
+		if( src->client >= 0 && src->port >= 0 )
+		{
+			if( snd_seq_connect_to(src->a_seq, src->a_port, src->client, src->port) < 0 )
+				return GST_STATE_CHANGE_FAILURE;
+		}
       break;
     case GST_STATE_CHANGE_READY_TO_PAUSED:
 		return GST_STATE_CHANGE_NO_PREROLL;
@@ -225,6 +283,19 @@ gst_amidisrc_change_state (GstElement * element, GstStateChange transition )
   switch (transition) {
     case GST_STATE_CHANGE_READY_TO_NULL:
 		 // TODO: close our listening alsa ports
+		 // disconnect from midi port
+		printf("***Here: %s:%d\n",__FILE__,__LINE__);
+		if( src->a_queue >= 0 ){
+			if( snd_seq_free_queue( src->a_seq, src->a_queue ) < 0 )
+				return GST_STATE_CHANGE_FAILURE;
+		}
+		if( src->a_port >= 0 && src->a_seq != NULL){
+			if( snd_seq_delete_simple_port(src->a_seq,src->a_port) < 0 ){
+				return GST_STATE_CHANGE_FAILURE;
+			}
+		}
+		if( snd_seq_close( src->a_seq ) < 0 )
+			return GST_STATE_CHANGE_FAILURE;
       break;
 	 case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
 		return GST_STATE_CHANGE_NO_PREROLL;
